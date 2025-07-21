@@ -188,8 +188,8 @@ int gpio_read(int pin) {
         return -1;
     }
     
-    int value;
-    if (gpiod_line_get_value(gpio_ctx.lines[pin_index], &value) < 0) {
+    int value = gpiod_line_get_value(gpio_ctx.lines[pin_index]);
+    if (value < 0) {
         fprintf(stderr, "Failed to read from pin %d: %s\n", pin, strerror(errno));
         return -1;
     }

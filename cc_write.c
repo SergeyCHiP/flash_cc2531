@@ -225,8 +225,8 @@ void helpo()
 {
   fprintf(stderr,"usage : cc_write [-d pin_DD] [-c pin_DC] [-r pin_reset] file_to_flash\n"); 
   fprintf(stderr,"	-c : change pin_DC (default 27)\n");
-  fprintf(stderr,"	-d : change pin_DD (default 28)\n");
-  fprintf(stderr,"	-r : change reset pin (default 24)\n");
+  fprintf(stderr,"	-d : change pin_DD (default 17)\n");
+  fprintf(stderr,"	-r : change reset pin (default 22)\n");
   fprintf(stderr,"	-m : change multiplier for time delay (default auto)\n");
 }
 
