@@ -14,7 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 *************************************************************************/
 
-#include <wiringPi.h>
+#include "GPIOlibgpiod.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>

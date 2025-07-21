@@ -7,6 +7,10 @@
 #define CC_ERROR_NOT_DEBUGGING  2
 #define CC_ERROR_NOT_WIRED      3
 
+// GPIO направления (для совместимости с wiringPi)
+#define INPUT  0
+#define OUTPUT 1
+
 // defaŭltaj valoroj por pingloj
 // por restarigi al pinglo 35, DC al pinglo 36, DD al pinglo 38
 #define PIN_RST 24

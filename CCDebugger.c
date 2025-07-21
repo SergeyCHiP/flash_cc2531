@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 *************************************************************************/
 
-#include <wiringPi.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +23,7 @@
 #include <time.h>
 
 #include "CCDebugger.h"
+#include "GPIOlibgpiod.h"
 
   /**
    * Switch reset pin
@@ -76,19 +76,14 @@ int cc_init( int pRST, int pDC, int pDD )
   if(pDC>=0) pinDC=pDC;
   if(pDD>=0) pinDD=pDD;
 
-  if(wiringPiSetup() == -1){
-    printf("no wiring pi detected\n");
+  if(gpio_init(pinRST, pinDC, pinDD) == -1){
+    printf("Failed to initialize GPIO with libgpiod\n");
     return 0;
   }
   cc_delay_calibrate();
 
-  // Prepare CC Pins
-  pinMode(pinDC,        OUTPUT);
-  pinMode(pinDD,      OUTPUT);
-  pinMode(pinRST,       OUTPUT);
-  digitalWrite(pinDC,   LOW);
-  digitalWrite(pinDD, LOW);
-  digitalWrite(pinRST,  LOW);
+  // Prepare CC Pins - все уже настроено в gpio_init()
+  // Начальное состояние: все пины как выходы с низким уровнем
 
   // Prepare default direction
   cc_setDDDirection(INPUT);
@@ -111,6 +106,7 @@ int cc_init( int pRST, int pDC, int pDD )
   // We are active by default
   cc_active = true;
 
+  return 1;
 };
 
 /**
@@ -128,13 +124,14 @@ void cc_setActive( uint8_t on )
 
   if (on) {
 
-    // Prepare CC Pins
-    pinMode(pinDC,        OUTPUT);
-    pinMode(pinDD,      OUTPUT);
-    pinMode(pinRST,       OUTPUT);
-    digitalWrite(pinDC,   LOW);
-    digitalWrite(pinDD, LOW);
-    digitalWrite(pinRST,  LOW);
+    // Prepare CC Pins - все уже настроено в gpio_init()
+    // Устанавливаем все пины как выходы с низким уровнем
+    gpio_set_mode(pinDC, GPIO_OUTPUT);
+    gpio_set_mode(pinDD, GPIO_OUTPUT);
+    gpio_set_mode(pinRST, GPIO_OUTPUT);
+    gpio_write(pinDC, GPIO_LOW);
+    gpio_write(pinDD, GPIO_LOW);
+    gpio_write(pinRST, GPIO_LOW);
 
     // Default direction is INPUT
     cc_setDDDirection(INPUT);
@@ -146,12 +143,15 @@ void cc_setActive( uint8_t on )
       cc_exit();
 
     // Put everything in inactive mode
-    pinMode(pinDC,        INPUT);
-    pinMode(pinDD,      INPUT);
-    pinMode(pinRST,       INPUT);
-    digitalWrite(pinDC,   LOW);
-    digitalWrite(pinDD, LOW);
-    digitalWrite(pinRST,  LOW);
+    gpio_set_mode(pinDC, GPIO_INPUT);
+    gpio_set_mode(pinDD, GPIO_INPUT);
+    gpio_set_mode(pinRST, GPIO_INPUT);
+    gpio_write(pinDC, GPIO_LOW);
+    gpio_write(pinDD, GPIO_LOW);
+    gpio_write(pinRST, GPIO_LOW);
+
+    // Cleanup GPIO resources
+    gpio_cleanup();
 
   }
 }
@@ -200,14 +200,17 @@ int cc_getmult()
 /* provas konsideri la rapidecon de la procesoro */
 void cc_delay_calibrate( )
 {
-  long time0=micros();
+  struct timespec start, end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
   cc_delay(200);
   cc_delay(200);
   cc_delay(200);
   cc_delay(200);
   cc_delay(200);
-  long time1=micros();
-  cc_delay_mult=cc_delay_mult*600/(time1-time0);
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  
+  long time_diff = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+  cc_delay_mult = cc_delay_mult * 600 / time_diff;
 }
 
 /**
@@ -225,17 +228,17 @@ uint8_t cc_enter()
   errorFlag = CC_ERROR_NONE;
 
   // Enter debug mode
-  digitalWrite(pinRST, LOW);
+  gpio_write(pinRST, GPIO_LOW);
   cc_delay(200);
-  digitalWrite(pinDC, HIGH);
+  gpio_write(pinDC, GPIO_HIGH);
   cc_delay(3);
-  digitalWrite(pinDC, LOW);
+  gpio_write(pinDC, GPIO_LOW);
   cc_delay(3);
-  digitalWrite(pinDC, HIGH);
+  gpio_write(pinDC, GPIO_HIGH);
   cc_delay(3);
-  digitalWrite(pinDC, LOW);
+  gpio_write(pinDC, GPIO_LOW);
   cc_delay(4);
-  digitalWrite(pinRST, HIGH);
+  gpio_write(pinRST, GPIO_HIGH);
   cc_delay(200);
 
   // We are now in debug mode
@@ -273,19 +276,19 @@ uint8_t cc_write( uint8_t data )
 
     // First put data bit on bus
     if (data & 0x80)
-      digitalWrite(pinDD, HIGH);
+      gpio_write(pinDD, GPIO_HIGH);
     else
-      digitalWrite(pinDD, LOW);
+      gpio_write(pinDD, GPIO_LOW);
 
     // Place clock on high (other end reads data)
-    digitalWrite(pinDC, HIGH);
+    gpio_write(pinDC, GPIO_HIGH);
 
     // Shift & Delay
     data <<= 1;
     cc_delay(2);
 
     // Place clock down
-    digitalWrite(pinDC, LOW);
+    gpio_write(pinDC, GPIO_LOW);
     cc_delay(2);
 
   }
@@ -319,13 +322,13 @@ uint8_t cc_switchRead(uint8_t maxWaitCycles)
   cc_delay(2);
 
   // Wait for DD to go LOW (Chip is READY)
-  while (digitalRead(pinDD) == HIGH) {
+  while (gpio_read(pinDD) == GPIO_HIGH) {
 
     // Do 8 clock cycles
     for (cnt = 8; cnt; cnt--) {
-      digitalWrite(pinDC, HIGH);
+      gpio_write(pinDC, GPIO_HIGH);
       cc_delay(2);
-      digitalWrite(pinDC, LOW);
+      gpio_write(pinDC, GPIO_LOW);
       cc_delay(2);
     }
 
@@ -380,15 +383,15 @@ uint8_t cc_read()
 
   // Send 8 clock pulses if we are HIGH
   for (cnt = 8; cnt; cnt--) {
-    digitalWrite(pinDC, HIGH);
+    gpio_write(pinDC, GPIO_HIGH);
     cc_delay(2);
 
     // Shift and read
     data <<= 1;
-    if (digitalRead(pinDD) == HIGH)
+    if (gpio_read(pinDD) == GPIO_HIGH)
       data |= 0x01;
 
-    digitalWrite(pinDC, LOW);
+    gpio_write(pinDC, GPIO_LOW);
     cc_delay(2);
   }
 
@@ -408,26 +411,26 @@ void cc_setDDDirection( uint8_t direction )
 
   // Handle new direction
   if (ddIsOutput) {
-    digitalWrite(pinDD, LOW); // Disable pull-up
-    pinMode(pinDD, OUTPUT);   // Enable output
-    digitalWrite(pinDD, LOW); // Switch to low
+    gpio_write(pinDD, GPIO_LOW); // Disable pull-up
+    gpio_set_mode(pinDD, GPIO_OUTPUT);   // Enable output
+    gpio_write(pinDD, GPIO_LOW); // Switch to low
   } else {
-    digitalWrite(pinDD, LOW); // Disable pull-up
-    pinMode(pinDD, INPUT);    // Disable output
-    digitalWrite(pinDD, LOW); // Don't use output pull-up
+    gpio_write(pinDD, GPIO_LOW); // Disable pull-up
+    gpio_set_mode(pinDD, GPIO_INPUT);    // Disable output
+    gpio_write(pinDD, GPIO_LOW); // Don't use output pull-up
   }
 
 }
 
 void cc_reset()
 {
-  pinMode(pinDC, INPUT);
-  pinMode(pinDD, INPUT);
-  pinMode(pinRST, OUTPUT);
+  gpio_set_mode(pinDC, GPIO_INPUT);
+  gpio_set_mode(pinDD, GPIO_INPUT);
+  gpio_set_mode(pinRST, GPIO_OUTPUT);
   cc_delay(200);
-  pinMode(pinRST, LOW);
+  gpio_write(pinRST, GPIO_LOW);
   cc_delay(500);
-  pinMode(pinRST, INPUT);
+  gpio_set_mode(pinRST, GPIO_INPUT);
 }
 
 /////////////////////////////////////////////////////////////////////
