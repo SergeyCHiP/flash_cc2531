@@ -12,10 +12,10 @@
 #define OUTPUT 1
 
 // defaŭltaj valoroj por pingloj
-// por restarigi al pinglo 35, DC al pinglo 36, DD al pinglo 38
-#define PIN_RST 24
+// por restarigi al pinglo 15, DC al pinglo 13, DD al pinglo 11
+#define PIN_RST 22
 #define PIN_DC  27
-#define PIN_DD 28
+#define PIN_DD 17
 
 // alternativaj valoroj por pingloj
 // por restarigi al pinglo 3, DC al pinglo 11, DD al pinglo 13

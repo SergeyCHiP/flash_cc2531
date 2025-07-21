@@ -76,16 +76,16 @@ make
 
 | CC2530/CC2531 | Raspberry Pi GPIO |
 |----------------|-------------------|
-| RST (Reset)    | GPIO 24 (Pin 18) |
+| RST (Reset)    | GPIO 22 (Pin 15) |
 | DC (Data/Control) | GPIO 27 (Pin 13) |
-| DD (Data)      | GPIO 28 (Pin 3)  |
+| DD (Data)      | GPIO 17 (Pin 11) |
 
 ### Изменение пинов (опционально):
 ```bash
-./cc_chipid -r 24 -c 27 -d 28
-./cc_erase -r 24 -c 27 -d 28
-./cc_read -r 24 -c 27 -d 28 output.hex
-./cc_write -r 24 -c 27 -d 28 firmware.hex
+./cc_chipid -r 22 -c 27 -d 17
+./cc_erase -r 22 -c 27 -d 17
+./cc_read -r 22 -c 27 -d 17 output.hex
+./cc_write -r 22 -c 27 -d 17 firmware.hex
 ```
 
 ## Преимущества новой версии
